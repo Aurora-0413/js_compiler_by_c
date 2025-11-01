@@ -14,6 +14,8 @@ parser.output
 # 编译输出
 js_parser
 js_parser.exe
+js_lexer
+js_lexer.exe
 
 # 调试文件
 *.dSYM/
@@ -57,6 +59,15 @@ test_output/
 build/
 bin/
 obj/
+
+# 测试可执行文件
+test.c
+test.exe
+
+# 临时开发文件
+tokens.c
+tokens.h
+SETUP.md
 
 # 其他
 *.a
