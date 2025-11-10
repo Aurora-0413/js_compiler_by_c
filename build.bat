@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 REM JavaScript 词法分析器构建脚本 (Windows)
 
 set GCC=D:\mingw64\bin\gcc.exe
@@ -146,18 +147,73 @@ exit /b 0
 :testparse
 call :parser
 if errorlevel 1 goto end
-set TEST_FILES=tests\test_basic.js tests\test_simple.js tests\test_functions.js tests\test_for_loops.js tests\test_literals.js tests\test_asi_basic.js tests\test_asi_return.js tests\test_asi_control.js tests\test_while.js tests\test_switch.js tests\test_try.js tests\test_operators.js
-for %%F in (%TEST_FILES%) do (
-    if not exist %%F (
-        echo ERROR: Test file %%F not found!
-        exit /b 1
+
+echo.
+echo ================================================
+echo Running All Tests in tests\ folder
+echo ================================================
+echo.
+
+set TOTAL=0
+set PASSED=0
+set FAILED=0
+
+REM 遍历 tests 文件夹中的所有 .js 文件
+for %%F in (tests\*.js) do (
+    set /a TOTAL+=1
+    
+    REM 检查是否是错误测试用例（文件名包含 test_error 或 temp）
+    set EXPECT_FAIL=0
+    echo %%F | findstr /i "test_error temp" >nul
+    if not errorlevel 1 set EXPECT_FAIL=1
+    
+    echo Running parser test: %%F
+    
+    REM 执行测试并捕获退出码
+    js_parser.exe %%F
+    set RESULT=!errorlevel!
+    
+    REM 判断测试结果
+    if !EXPECT_FAIL! equ 1 (
+        REM 期望失败的测试
+        if !RESULT! equ 0 (
+            echo   [debug] result=!RESULT!, expect_fail=!EXPECT_FAIL!
+            echo   Expected failure but parser succeeded.
+            set /a FAILED+=1
+        ) else (
+            echo   [debug] result=!RESULT!, expect_fail=!EXPECT_FAIL!
+            set /a PASSED+=1
+        )
+    ) else (
+        REM 期望成功的测试
+        if !RESULT! equ 0 (
+            echo   [debug] result=!RESULT!, expect_fail=!EXPECT_FAIL!
+            set /a PASSED+=1
+        ) else (
+            echo   [debug] result=!RESULT!, expect_fail=!EXPECT_FAIL!
+            echo   Expected success but parser failed.
+            set /a FAILED+=1
+        )
     )
 )
-for %%F in (%TEST_FILES%) do (
-    echo Running parser test: %%F
-    js_parser.exe %%F
-    if errorlevel 1 goto end
+
+echo.
+echo ================================================
+echo Test Results Summary
+echo ================================================
+echo Total files:     %TOTAL%
+echo Passed:          %PASSED%
+echo Failed:          %FAILED%
+echo ================================================
+echo.
+
+if %FAILED% gtr 0 (
+    echo TEST SUITE FAILED - %FAILED% test^(s^) failed
+    exit /b 1
+) else (
+    echo TEST SUITE PASSED - All %PASSED% test^(s^) passed
 )
+
 goto end
 
 :end

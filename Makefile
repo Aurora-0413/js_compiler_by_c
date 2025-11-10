@@ -87,32 +87,59 @@ test-lex: $(LEXER_TARGET) test-setup
 	@./$(LEXER_TARGET) tests/test_basic.js
 	@echo.
 
-TEST_PARSE_FILES = \
-	tests/test_basic.js \
-	tests/test_simple.js \
-	tests/test_functions.js \
-	tests/test_for_loops.js \
-	tests/test_literals.js \
-	tests/test_asi_basic.js \
-	tests/test_asi_return.js \
-	tests/test_asi_control.js \
-	tests/test_while.js \
-	tests/test_switch.js \
-	tests/test_try.js \
-	tests/test_operators.js
-
 test-parse: $(PARSER_TARGET)
-	@for f in $(TEST_PARSE_FILES); do \
-		if [ ! -f $$f ]; then \
-			echo "Missing test file: $$f"; \
-			exit 1; \
+	@echo ""
+	@echo "================================================"
+	@echo "Running All Tests in tests/ folder"
+	@echo "================================================"
+	@echo ""
+	@total=0; passed=0; failed=0; \
+	for f in tests/*.js; do \
+		total=$$((total + 1)); \
+		expect_fail=0; \
+		case "$$f" in \
+			*test_error*|*temp*) \
+				expect_fail=1; \
+				;; \
+		esac; \
+		echo "Running parser test: $$f"; \
+		if ./$(PARSER_TARGET) $$f; then \
+			result=0; \
+		else \
+			result=$$?; \
 		fi; \
-	done
-	@for f in $(TEST_PARSE_FILES); do \
-		echo "=== Running Parser Test: $$f ==="; \
-		./$(PARSER_TARGET) $$f || exit $$?; \
-		echo; \
-	done
+		echo "  [debug] result=$$result, expect_fail=$$expect_fail"; \
+		if [ $$expect_fail -eq 1 ]; then \
+			if [ $$result -eq 0 ]; then \
+				echo "  Expected failure but parser succeeded."; \
+				failed=$$((failed + 1)); \
+			else \
+				passed=$$((passed + 1)); \
+			fi; \
+		else \
+			if [ $$result -eq 0 ]; then \
+				passed=$$((passed + 1)); \
+			else \
+				echo "  Expected success but parser failed."; \
+				failed=$$((failed + 1)); \
+			fi; \
+		fi; \
+	done; \
+	echo ""; \
+	echo "================================================"; \
+	echo "Test Results Summary"; \
+	echo "================================================"; \
+	echo "Total files:     $$total"; \
+	echo "Passed:          $$passed"; \
+	echo "Failed:          $$failed"; \
+	echo "================================================"; \
+	echo ""; \
+	if [ $$failed -gt 0 ]; then \
+		echo "TEST SUITE FAILED - $$failed test(s) failed"; \
+		exit 1; \
+	else \
+		echo "TEST SUITE PASSED - All $$passed test(s) passed"; \
+	fi
 
 # 帮助信息
 help:
