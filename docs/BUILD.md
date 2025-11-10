@@ -103,7 +103,20 @@ Total tokens: 106
 Parsing successful! Input file: tests\test_basic.js
 ```
 
-**错误示例：**
+### 自动分号插入（ASI）
+
+解析器已实现 ECMAScript 5.1 规范中的自动分号插入逻辑，核心特性如下：
+
+- **触发条件**：
+  1. Token 之间存在换行且继续解析会产生语法错误。
+  2. 输入流结束（EOF）。
+  3. 受限产生式（`return` / `break` / `continue` / `throw`）后遇到换行或文件结束。
+- **关键实现**：`parser_lex_adapter.c` 通过 `lexer->has_newline` 标志、上一 Token 记录以及控制语句括号栈在必要时注入虚拟分号。
+- **典型场景**：`a
++b` 会被拆分为 `a; ++b`，`return
+  **错误示例：**
+
+运行 `build.bat test-parse` 或 `make test-parse` 可一次性验证基础语法与 ASI 相关用例。
 
 ```text
 Parsing failed. Input file: tests\test_error_object.js
@@ -221,12 +234,6 @@ lexer.re:89:25: warning: unused variable 'comment_start'
 
 ## 下一步开发计划
 
-### 优先级 P1 - ASI 机制
-
-- [ ] 实现自动分号插入（Automatic Semicolon Insertion）
-- [ ] 利用已有的 `has_newline` 标记
-- [ ] 支持受限产生式（`return`/`break`/`continue`/`throw` 后的换行）
-
 ### 优先级 P2 - AST 构建
 
 - [ ] 在 parser.y 的语义动作中创建 AST 节点
@@ -257,6 +264,9 @@ lexer.re:89:25: warning: unused variable 'comment_start'
 
 - `tests/test_basic.js` - 综合基本语法测试 ✅
 - `tests/test_simple.js` - 简单功能测试 ✅
+- `tests/test_asi_basic.js` - ASI 基础场景 ✅
+- `tests/test_asi_return.js` - `return` 受限产生式 ✅
+- `tests/test_asi_control.js` - 与控制语句的协同 ✅
 - `tests/test_error_missing_semicolon.js` - 缺少分号错误测试 ✅
 - `tests/test_error_object.js` - 对象字面量错误测试 ✅
 - `tests/test_error_cases.js` - 错误用例集合（需逐个激活测试）
@@ -332,11 +342,11 @@ js_compiler_by_c/
 
 ## 参考资源
 
-- **ECMAScript 5.1 规范**: https://262.ecma-international.org/5.1/
-- **ASI 规则详解**: ECMAScript 规范 11.9 节
-- **re2c 手册**: https://re2c.org/manual/manual_c.html
-- **Bison 手册**: https://www.gnu.org/software/bison/manual/
-- **参考项目**: https://github.com/sunxfancy/flex-bison-examples
+- [ECMAScript 5.1 规范](https://262.ecma-international.org/5.1/)
+- [ASI 规则详解（11.9 节）](https://262.ecma-international.org/5.1/#sec-11.9)
+- [re2c 手册](https://re2c.org/manual/manual_c.html)
+- [Bison 手册](https://www.gnu.org/software/bison/manual/)
+- [参考项目：flex-bison-examples](https://github.com/sunxfancy/flex-bison-examples)
 
 ---
 
