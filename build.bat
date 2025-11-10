@@ -100,8 +100,6 @@ echo   help    - Show this help message
 echo.
 goto end
 
-:end
-
 :parser
 echo ================================================
 echo JavaScript Parser - Build (Bison)
@@ -140,7 +138,8 @@ if errorlevel 1 (
 )
 
 echo Build complete: js_parser.exe
-goto end
+echo.
+exit /b 0
 
 :testparse
 call :parser
@@ -151,3 +150,5 @@ if not exist tests\test_basic.js (
 )
 js_parser.exe tests\test_basic.js
 goto end
+
+:end
