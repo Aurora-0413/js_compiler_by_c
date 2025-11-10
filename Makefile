@@ -90,6 +90,9 @@ test-lex: $(LEXER_TARGET) test-setup
 TEST_PARSE_FILES = \
 	tests/test_basic.js \
 	tests/test_simple.js \
+	tests/test_functions.js \
+	tests/test_for_loops.js \
+	tests/test_literals.js \
 	tests/test_asi_basic.js \
 	tests/test_asi_return.js \
 	tests/test_asi_control.js \

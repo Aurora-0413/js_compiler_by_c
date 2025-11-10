@@ -4,18 +4,6 @@
 
 2025 年 11 月 10 日
 
-## 测试环境
-
-- 操作系统: Windows
-- 编译器: GCC (MinGW)
-- 构建工具: re2c 3.0+, Bison 3.x
-
-## 已实现功能
-
-### 1. 词法分析器 (js_lexer.exe) ✅
-
-**功能概览:**
-
 - 识别 27 个 ES5 关键字（var, let, const, function, if, else, for, return 等）
 - 识别 73+ 种运算符和分隔符
 - 支持数字字面量（整数、浮点数、科学计数法、十六进制）
@@ -88,43 +76,55 @@
 结果: ✅ Parsing successful!
 ```
 
-#### 测试 3: 错误检测 - 缺少分号 ✅
+#### 测试 3: 函数链调用与嵌套 ✅
 
 ```text
-测试文件: tests\test_error_missing_semicolon.js
-错误代码: var x = 10  // 缺少分号
-         var y = 20;
+测试文件: tests\test_functions.js
+包含内容:
+  - 函数嵌套声明与闭包调用
+  - for 循环内部多次 return
+  - 函数别名与重复调用
 
-结果: ✅ 正确检测错误
-错误信息: syntax error, unexpected VAR, expecting ';'
+结果: ✅ Parsing successful!
 ```
 
-#### 测试 4: 错误检测 - 对象字面量缺少冒号 ✅
+#### 测试 4: 多形态 for 循环 ✅
 
 ```text
-测试文件: tests\test_error_object.js
-错误代码: {
-           name "test",  // 缺少冒号
-           value: 42
-         }
+测试文件: tests\test_for_loops.js
+包含内容:
+  - 带初始化与空初始化的 for
+  - 内层 for 嵌套并累计结果
+  - 无限循环配合显式 break
 
-结果: ✅ 正确检测错误
-错误信息: syntax error, unexpected STRING, expecting ':'
+结果: ✅ Parsing successful!
 ```
 
-#### 测试 5: ASI - 基础语句 ✅
+#### 测试 5: 对象与数组文字 ✅
+
+```text
+测试文件: tests\test_literals.js
+包含内容:
+  - 多层对象/数组字面量
+  - 条件运算符更新布尔字段
+  - 数组长度聚合与函数调用
+
+结果: ✅ Parsing successful!
+```
+
+#### 测试 6: ASI - 基础语句 ✅
 
 ```text
 测试文件: tests\test_asi_basic.js
 包含内容:
   - 省略分号的变量声明与表达式语句
   - `a\n++b` 触发受限 ASI
-  - 链式调用 `console.log`（确保属性访问跨行解析正常）
+  - 链式调用 `console.log`
 
 结果: ✅ Parsing successful!
 ```
 
-#### 测试 6: ASI - return 语句 ✅
+#### 测试 7: ASI - return 语句 ✅
 
 ```text
 测试文件: tests\test_asi_return.js
@@ -135,7 +135,7 @@
 结果: ✅ Parsing successful!
 ```
 
-#### 测试 7: ASI - 控制流协同 ✅
+#### 测试 8: ASI - 控制流协同 ✅
 
 ```text
 测试文件: tests\test_asi_control.js
@@ -146,7 +146,7 @@
 结果: ✅ Parsing successful!
 ```
 
-#### 测试 8: 循环与标签语句 ✅
+#### 测试 9: 循环与标签语句 ✅
 
 ```text
 测试文件: tests\test_while.js
@@ -157,7 +157,7 @@
 结果: ✅ Parsing successful!
 ```
 
-#### 测试 9: switch-case 控制流 ✅
+#### 测试 10: switch-case 控制流 ✅
 
 ```text
 测试文件: tests\test_switch.js
@@ -168,13 +168,25 @@
 结果: ✅ Parsing successful!
 ```
 
-#### 测试 10: try-catch-finally 与 with ✅
+#### 测试 11: try-catch-finally 与 with ✅
 
 ```text
 测试文件: tests\test_try.js
 包含内容:
   - try/catch/finally 组合
   - with 语句与对象上下文绑定
+
+结果: ✅ Parsing successful!
+```
+
+#### 测试 12: 运算符与复合赋值 ✅
+
+```text
+测试文件: tests\test_operators.js
+包含内容:
+  - 全量复合赋值与位运算符
+  - 三元运算与逗号运算符
+  - typeof/delete/void 一元关键字
 
 结果: ✅ Parsing successful!
 ```
@@ -189,6 +201,13 @@
 
 结果: ✅ AST dump 输出完整，层级符合预期
 ```
+
+#### 错误检测验证
+
+- `tests\test_error_missing_semicolon.js`：缺少分号触发 `syntax error, unexpected VAR, expecting ';'`
+- `tests\test_error_object.js`：对象属性缺冒号触发 `syntax error, unexpected STRING, expecting ':'`
+- `tests\test_error_unclosed_block.js`：缺少右花括号触发 `syntax error, unexpected end of file`
+- `tests\test_error_invalid_for.js`：for 头部缺 `)` 触发 `syntax error, unexpected '{', expecting ')'`
 
 ### 问题回顾与解决
 
@@ -212,7 +231,7 @@ lexer.re:82:20: warning: sentinel symbol 0 occurs in the middle of the rule
 ### 警告 2: Bison 冲突警告
 
 ```text
-parser.y: 警告: 2 项偏移/归约冲突 [-Wconflicts-sr]
+parser.y: 警告: 3 项偏移/归约冲突 [-Wconflicts-sr]
 ```
 
 **影响:** 不影响功能，Bison 使用默认规则解决冲突
@@ -266,10 +285,8 @@ lexer.re:89:25: warning: unused variable 'comment_start'
 
 ## 尚未实现的功能
 
-### ⏳ 待实现（优先级 P4-P5）
+### ⏳ 待实现（优先级 P5）
 
-- [ ] 完整运算符支持（三元运算符 `?:`、位运算、复合赋值、逗号运算符）
-- [ ] 一元关键字运算符扩展（typeof、delete、void）
 - [ ] 正则表达式字面量
 - [ ] 模板字符串
 - [ ] ES6+ 特性（箭头函数、类、async/await 等）
@@ -298,14 +315,17 @@ lexer.re:89:25: warning: unused variable 'comment_start'
 
 ## 测试覆盖率总结
 
-| 功能类别   | 测试数量 | 通过数量 | 覆盖率   |
-| ---------- | -------- | -------- | -------- |
-| 词法分析   | 1        | 1        | 100%     |
-| 基本语法   | 2        | 2        | 100%     |
-| ASI 行为   | 3        | 3        | 100%     |
-| 控制流扩展 | 3        | 3        | 100%     |
-| 错误检测   | 2        | 2        | 100%     |
-| **总计**   | **11**   | **11**   | **100%** |
+| 功能类别     | 测试数量 | 通过数量 | 覆盖率   |
+| ------------ | -------- | -------- | -------- |
+| 词法分析     | 1        | 1        | 100%     |
+| 基础语法     | 3        | 3        | 100%     |
+| 字面量与对象 | 1        | 1        | 100%     |
+| 循环与控制流 | 3        | 3        | 100%     |
+| 异常与 with  | 1        | 1        | 100%     |
+| ASI 行为     | 3        | 3        | 100%     |
+| 运算符扩展   | 1        | 1        | 100%     |
+| 错误检测     | 4        | 4        | 100%     |
+| **总计**     | **17**   | **17**   | **100%** |
 
 ## 结论
 
@@ -324,8 +344,8 @@ lexer.re:89:25: warning: unused variable 'comment_start'
 
 下一步建议：
 
-1. **推进运算符完整性（P4）**：实现三元、位运算与复合赋值，完善一元关键字运算符。
-2. **扩充测试矩阵**：按运算符类别新增正/负向用例，并将 `build.bat test-parse` 集成到 CI。
+1. **评估 P5 高级特性**：按照 TODO 列表优先实现正则字面量、模板字符串等 ES6+ 语法。
+2. **引入自动化测试**：将 `build.bat test-parse` 纳入 CI，并探索模糊测试发掘异常输入。
 3. **解决遗留警告**：处理 re2c sentinel 配置、Bison 冲突校准与未使用变量清理。
 
 ## 测试文件清单
@@ -333,14 +353,20 @@ lexer.re:89:25: warning: unused variable 'comment_start'
 - `js_lexer.exe tests/test_basic.js` - 词法分析输出检查 ✅
 - `tests/test_basic.js` - 综合基本语法测试 ✅
 - `tests/test_simple.js` - 简单函数与表达式测试 ✅
+- `tests/test_functions.js` - 函数嵌套与循环调用测试 ✅
+- `tests/test_for_loops.js` - 多形态 for 循环测试 ✅
+- `tests/test_literals.js` - 对象与数组文字解析测试 ✅
 - `tests/test_asi_basic.js` - ASI 基础语句覆盖 ✅
 - `tests/test_asi_return.js` - 受限产生式（return）测试 ✅
 - `tests/test_asi_control.js` - ASI 与控制流协同测试 ✅
 - `tests/test_while.js` - while/do-while + 标签跳转测试 ✅
 - `tests/test_switch.js` - switch-case/default 控制流测试 ✅
-- `tests/test_try.js` - try/catch/finally + with 组合测试 ✅
+- `tests/test_try.js` - try/catch-finally + with 组合测试 ✅
+- `tests/test_operators.js` - 运算符与复合赋值覆盖 ✅
 - `tests/test_error_missing_semicolon.js` - 缺少分号错误测试 ✅
 - `tests/test_error_object.js` - 对象字面量缺冒号错误测试 ✅
+- `tests/test_error_unclosed_block.js` - 缺失右花括号错误测试 ✅
+- `tests/test_error_invalid_for.js` - for 头部缺右括号错误测试 ✅
 
 ---
 

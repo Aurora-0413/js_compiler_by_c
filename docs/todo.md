@@ -370,10 +370,11 @@ ASI (Automatic Semicolon Insertion) 是 JavaScript 的核心特性，允许省�
 
 ## 🧪 测试扩展
 
-- [ ] **Test 1**: 创建完整的测试套件
+- [x] **Test 1**: 创建完整的测试套件
 
-  - 按语法类别组织测试（statements、expressions、literals 等）
-  - 每个特性至少 3 个测试用例（正常、边界、错误）
+  - 新增正向用例：`tests/test_functions.js`（函数声明/调用链）、`tests/test_for_loops.js`（多种 for 结构）、`tests/test_literals.js`（对象/数组文字与访问）
+  - 新增负向用例：`tests/test_error_unclosed_block.js`、`tests/test_error_invalid_for.js`（覆盖缺失 `}` / `)` 错误路径）
+  - `build.bat test-parse` / `make test-parse` 默认跑通 12 个正向场景
 
 - [ ] **Test 2**: 模糊测试 (Fuzzing)
 
