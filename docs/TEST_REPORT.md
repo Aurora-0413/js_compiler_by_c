@@ -350,23 +350,23 @@ lexer.re:89:25: warning: unused variable 'comment_start'
 
 ## 测试文件清单
 
-- `js_lexer.exe tests/test_basic.js` - 词法分析输出检查 ✅
-- `tests/test_basic.js` - 综合基本语法测试 ✅
-- `tests/test_simple.js` - 简单函数与表达式测试 ✅
-- `tests/test_functions.js` - 函数嵌套与循环调用测试 ✅
-- `tests/test_for_loops.js` - 多形态 for 循环测试 ✅
-- `tests/test_literals.js` - 对象与数组文字解析测试 ✅
-- `tests/test_asi_basic.js` - ASI 基础语句覆盖 ✅
-- `tests/test_asi_return.js` - 受限产生式（return）测试 ✅
-- `tests/test_asi_control.js` - ASI 与控制流协同测试 ✅
-- `tests/test_while.js` - while/do-while + 标签跳转测试 ✅
-- `tests/test_switch.js` - switch-case/default 控制流测试 ✅
-- `tests/test_try.js` - try/catch-finally + with 组合测试 ✅
-- `tests/test_operators.js` - 运算符与复合赋值覆盖 ✅
-- `tests/test_error_missing_semicolon.js` - 缺少分号错误测试 ✅
-- `tests/test_error_object.js` - 对象字面量缺冒号错误测试 ✅
-- `tests/test_error_unclosed_block.js` - 缺失右花括号错误测试 ✅
-- `tests/test_error_invalid_for.js` - for 头部缺右括号错误测试 ✅
+- `js_lexer.exe tests/test_basic.js` - 词法分析输出检查 ✅（命令：`js_lexer.exe tests\test_basic.js`）
+- `tests/test_basic.js` - 综合基本语法测试 ✅（命令：`js_parser.exe tests\test_basic.js`）
+- `tests/test_simple.js` - 简单函数与表达式测试 ✅（命令：`js_parser.exe tests\test_simple.js`）
+- `tests/test_functions.js` - 函数嵌套与循环调用测试 ✅（命令：`js_parser.exe tests\test_functions.js`）
+- `tests/test_for_loops.js` - 多形态 for 循环测试 ✅（命令：`js_parser.exe tests\test_for_loops.js`）
+- `tests/test_literals.js` - 对象与数组文字解析测试 ✅（命令：`js_parser.exe tests\test_literals.js`）
+- `tests/test_asi_basic.js` - ASI 基础语句覆盖 ✅（命令：`js_parser.exe tests\test_asi_basic.js`）
+- `tests/test_asi_return.js` - 受限产生式（return）测试 ✅（命令：`js_parser.exe tests\test_asi_return.js`）
+- `tests/test_asi_control.js` - ASI 与控制流协同测试 ✅（命令：`js_parser.exe tests\test_asi_control.js`）
+- `tests/test_while.js` - while/do-while + 标签跳转测试 ✅（命令：`js_parser.exe tests\test_while.js`）
+- `tests/test_switch.js` - switch-case/default 控制流测试 ✅（命令：`js_parser.exe tests\test_switch.js`）
+- `tests/test_try.js` - try/catch-finally + with 组合测试 ✅（命令：`js_parser.exe tests\test_try.js`）
+- `tests/test_operators.js` - 运算符与复合赋值覆盖 ✅（命令：`js_parser.exe tests\test_operators.js`）
+- `tests/test_error_missing_semicolon.js` - 缺少分号错误测试 ✅（命令：`js_parser.exe tests\test_error_missing_semicolon.js`）
+- `tests/test_error_object.js` - 对象字面量缺冒号错误测试 ✅（命令：`js_parser.exe tests\test_error_object.js`）
+- `tests/test_error_unclosed_block.js` - 缺失右花括号错误测试 ✅（命令：`js_parser.exe tests\test_error_unclosed_block.js`）
+- `tests/test_error_invalid_for.js` - for 头部缺右括号错误测试 ✅（命令：`js_parser.exe tests\test_error_invalid_for.js`）
 
 ---
 
