@@ -18,7 +18,7 @@ PARSER_TARGET = js_parser.exe
 LEXER_SOURCES  = main.c lexer.c
 LEXER_OBJECTS  = $(LEXER_SOURCES:.c=.o)
 
-PARSER_SOURCES = parser.c parser_main.c parser_lex_adapter.c lexer.c
+PARSER_SOURCES = parser.c parser_main.c parser_lex_adapter.c lexer.c ast.c
 PARSER_OBJECTS = $(PARSER_SOURCES:.c=.o)
 
 # 默认目标
@@ -49,7 +49,7 @@ parser_lex_adapter.o: parser_lex_adapter.c parser.h token.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # 明确依赖，避免并行/顺序导致缺少头文件
-parser_main.o: parser_main.c parser.h
+parser_main.o: parser_main.c parser.h ast.h
 	@echo "Compiling $<..."
 	$(CC) $(CFLAGS) -c $< -o $@
 

@@ -1,27 +1,40 @@
 /*
  * JavaScript 语法分析器（Bison）
- * 目标：在不改变项目现有风格的前提下，支持 tests/test_basic.js 的语法通过
- * 说明：本解析器仅做语法校验，不构建 AST；如需扩展，可在语义动作中逐步加入 AST 构建
+ * 现支持在语义动作中构建 AST，并可通过 --dump-ast 选项输出树结构。
  */
 
 %{
 #include <stdio.h>
 #include <stdlib.h>
+#include "ast.h"
 
-// 由 parser_lex_adapter.c 提供
 int yylex(void);
 void yyerror(const char *s);
+
+static ASTNode *g_parser_ast_root = NULL;
 %}
 
-// 关键字与字面量等 token（避免与 token.h 中的枚举名冲突，去掉 TOK_ 前缀）
+%code provides {
+    ASTNode *parser_take_ast(void);
+}
+
+%code requires {
+    #include "ast.h"
+}
+
+%union {
+    ASTNode *node;
+    ASTList *list;
+    char *str;
+}
+
 %token VAR LET CONST FUNCTION IF ELSE FOR RETURN
 %token WHILE DO BREAK CONTINUE
 %token SWITCH CASE DEFAULT TRY CATCH FINALLY THROW NEW THIS TYPEOF DELETE IN INSTANCEOF VOID WITH DEBUGGER
 
 %token TRUE FALSE NULL_T UNDEFINED
-%token IDENTIFIER NUMBER STRING
+%token <str> IDENTIFIER NUMBER STRING
 
-// 复合/关系/逻辑运算符
 %token PLUS_PLUS MINUS_MINUS
 %token EQ NE EQ_STRICT NE_STRICT
 %token LE GE AND OR
@@ -29,7 +42,6 @@ void yyerror(const char *s);
 %token PLUS_ASSIGN MINUS_ASSIGN STAR_ASSIGN SLASH_ASSIGN PERCENT_ASSIGN
 %token AND_ASSIGN OR_ASSIGN XOR_ASSIGN LSHIFT_ASSIGN RSHIFT_ASSIGN URSHIFT_ASSIGN
 
-// 运算符结合性与优先级（从低到高）
 %define parse.error verbose
 %right '='
 %left OR
@@ -40,265 +52,399 @@ void yyerror(const char *s);
 %left '*' '/' '%'
 %right UMINUS '!' '~' PLUS_PLUS MINUS_MINUS
 
+%type <node> program stmt block var_stmt opt_init return_stmt if_stmt for_stmt func_decl for_init opt_expr
+%type <node> expr assignment_expr logical_or_expr logical_and_expr equality_expr relational_expr additive_expr multiplicative_expr unary_expr postfix_expr primary_expr
+%type <node> expr_no_obj assignment_expr_no_obj logical_or_expr_no_obj logical_and_expr_no_obj equality_expr_no_obj relational_expr_no_obj additive_expr_no_obj multiplicative_expr_no_obj unary_expr_no_obj postfix_expr_no_obj primary_no_obj
+%type <node> array_literal object_literal prop
+%type <list> stmt_list opt_param_list param_list opt_arg_list arg_list el_list prop_list
+
 %%
 
 program
   : stmt_list
+      {
+          $$ = ast_make_program($1);
+          g_parser_ast_root = $$;
+      }
   ;
 
 stmt_list
   : /* empty */
+      { $$ = NULL; }
   | stmt_list stmt
+      { $$ = ast_list_append($1, $2); }
   ;
 
 stmt
-  : ';'                                 /* 空语句 */
+  : ';'
+      { $$ = ast_make_empty_statement(); }
   | var_stmt ';'
-  | expr_no_obj ';'                     /* 表达式语句：禁止以 { 开头，从而避免与 block 冲突 */
+      { $$ = $1; }
+  | expr_no_obj ';'
+      { $$ = ast_make_expression_stmt($1); }
   | block
+      { $$ = $1; }
   | if_stmt
+      { $$ = $1; }
   | for_stmt
+      { $$ = $1; }
   | func_decl
+      { $$ = $1; }
   | return_stmt ';'
+      { $$ = $1; }
   ;
 
 block
   : '{' '}'
+      { $$ = ast_make_block(NULL); }
   | '{' stmt_list '}'
+      { $$ = ast_make_block($2); }
   ;
 
-// 变量声明：本仓库测试只涉及单个声明，支持可选初始化
 var_stmt
   : VAR IDENTIFIER opt_init
+      { $$ = ast_make_var_decl(AST_VAR_KIND_VAR, $2, $3); }
   | LET IDENTIFIER opt_init
+      { $$ = ast_make_var_decl(AST_VAR_KIND_LET, $2, $3); }
   | CONST IDENTIFIER opt_init
+      { $$ = ast_make_var_decl(AST_VAR_KIND_CONST, $2, $3); }
   ;
 
 opt_init
   : /* empty */
+      { $$ = NULL; }
   | '=' expr
+      { $$ = $2; }
   ;
 
 return_stmt
   : RETURN
+      { $$ = ast_make_return(NULL); }
   | RETURN expr
+      { $$ = ast_make_return($2); }
   ;
 
 if_stmt
   : IF '(' expr ')' stmt
+      { $$ = ast_make_if($3, $5, NULL); }
   | IF '(' expr ')' stmt ELSE stmt
+      { $$ = ast_make_if($3, $5, $7); }
   ;
 
 for_stmt
   : FOR '(' for_init ';' opt_expr ';' opt_expr ')' stmt
+      { $$ = ast_make_for($3, $5, $7, $9); }
   ;
 
 for_init
   : /* empty */
+      { $$ = NULL; }
   | var_stmt
+      { $$ = $1; }
   | expr
+      { $$ = $1; }
   ;
 
 opt_expr
   : /* empty */
+      { $$ = NULL; }
   | expr
+      { $$ = $1; }
   ;
 
 func_decl
   : FUNCTION IDENTIFIER '(' opt_param_list ')' block
+      { $$ = ast_make_function_decl($2, $4, $6); }
   ;
 
 opt_param_list
   : /* empty */
+      { $$ = NULL; }
   | param_list
+      { $$ = $1; }
   ;
 
 param_list
   : IDENTIFIER
+      { $$ = ast_list_append(NULL, ast_make_identifier($1)); }
   | param_list ',' IDENTIFIER
+      { $$ = ast_list_append($1, ast_make_identifier($3)); }
   ;
 
-// 表达式（从赋值到原子与后缀）
 expr
   : assignment_expr
+      { $$ = $1; }
   ;
 
 assignment_expr
   : postfix_expr '=' assignment_expr
+      { $$ = ast_make_assignment("=", $1, $3); }
   | logical_or_expr
+      { $$ = $1; }
   ;
 
 logical_or_expr
   : logical_and_expr
+      { $$ = $1; }
   | logical_or_expr OR logical_and_expr
+      { $$ = ast_make_binary("||", $1, $3); }
   ;
 
 logical_and_expr
   : equality_expr
+      { $$ = $1; }
   | logical_and_expr AND equality_expr
+      { $$ = ast_make_binary("&&", $1, $3); }
   ;
 
 equality_expr
   : relational_expr
+      { $$ = $1; }
   | equality_expr EQ relational_expr
+      { $$ = ast_make_binary("==", $1, $3); }
   | equality_expr NE relational_expr
+      { $$ = ast_make_binary("!=", $1, $3); }
   | equality_expr EQ_STRICT relational_expr
+      { $$ = ast_make_binary("===", $1, $3); }
   | equality_expr NE_STRICT relational_expr
+      { $$ = ast_make_binary("!==", $1, $3); }
   ;
 
 relational_expr
   : additive_expr
+      { $$ = $1; }
   | relational_expr '<' additive_expr
+      { $$ = ast_make_binary("<", $1, $3); }
   | relational_expr '>' additive_expr
-  | relational_expr LE  additive_expr
-  | relational_expr GE  additive_expr
+      { $$ = ast_make_binary(">", $1, $3); }
+  | relational_expr LE additive_expr
+      { $$ = ast_make_binary("<=", $1, $3); }
+  | relational_expr GE additive_expr
+      { $$ = ast_make_binary(">=", $1, $3); }
   ;
 
 additive_expr
   : multiplicative_expr
+      { $$ = $1; }
   | additive_expr '+' multiplicative_expr
+      { $$ = ast_make_binary("+", $1, $3); }
   | additive_expr '-' multiplicative_expr
+      { $$ = ast_make_binary("-", $1, $3); }
   ;
 
 multiplicative_expr
   : unary_expr
+      { $$ = $1; }
   | multiplicative_expr '*' unary_expr
+      { $$ = ast_make_binary("*", $1, $3); }
   | multiplicative_expr '/' unary_expr
+      { $$ = ast_make_binary("/", $1, $3); }
   | multiplicative_expr '%' unary_expr
+      { $$ = ast_make_binary("%", $1, $3); }
   ;
 
 unary_expr
   : postfix_expr
+      { $$ = $1; }
   | '+' unary_expr
+      { $$ = ast_make_unary("+", $2); }
   | '-' unary_expr %prec UMINUS
+      { $$ = ast_make_unary("-", $2); }
   | '!' unary_expr
+      { $$ = ast_make_unary("!", $2); }
   | '~' unary_expr
+      { $$ = ast_make_unary("~", $2); }
   | PLUS_PLUS unary_expr
+      { $$ = ast_make_update("++", $2, true); }
   | MINUS_MINUS unary_expr
+      { $$ = ast_make_update("--", $2, true); }
   ;
 
 postfix_expr
   : primary_expr
+      { $$ = $1; }
   | postfix_expr '.' IDENTIFIER
+      { $$ = ast_make_member($1, $3, false); }
   | postfix_expr '(' opt_arg_list ')'
+      { $$ = ast_make_call($1, $3); }
   | postfix_expr PLUS_PLUS
+      { $$ = ast_make_update("++", $1, false); }
   | postfix_expr MINUS_MINUS
+      { $$ = ast_make_update("--", $1, false); }
   ;
 
 opt_arg_list
   : /* empty */
+      { $$ = NULL; }
   | arg_list
+      { $$ = $1; }
   ;
 
 arg_list
   : expr
+      { $$ = ast_list_append(NULL, $1); }
   | arg_list ',' expr
+      { $$ = ast_list_append($1, $3); }
   ;
 
 primary_expr
   : IDENTIFIER
+      { $$ = ast_make_identifier($1); }
   | NUMBER
+      { $$ = ast_make_number_literal($1); }
   | STRING
+      { $$ = ast_make_string_literal($1); }
   | TRUE
+      { $$ = ast_make_boolean_literal(true); }
   | FALSE
+      { $$ = ast_make_boolean_literal(false); }
   | NULL_T
+      { $$ = ast_make_null_literal(); }
   | UNDEFINED
+      { $$ = ast_make_undefined_literal(); }
   | '(' expr ')'
+      { $$ = $2; }
   | array_literal
+      { $$ = $1; }
   | object_literal
+      { $$ = $1; }
   ;
 
-/*
- * 为了解决 if (...) { ... } 与以 { 开头的对象字面量表达式语句的冲突，
- * 我们为“表达式语句”引入一个不以 { 开头的表达式变体 expr_no_obj。
- * 对于需要对象字面量的场景（如初始化：a = { ... }），仍通过一般 expr 使用。
- */
 expr_no_obj
   : assignment_expr_no_obj
+      { $$ = $1; }
   ;
 
 assignment_expr_no_obj
   : postfix_expr_no_obj '=' assignment_expr
+      { $$ = ast_make_assignment("=", $1, $3); }
   | logical_or_expr_no_obj
+      { $$ = $1; }
   ;
 
 logical_or_expr_no_obj
   : logical_and_expr_no_obj
+      { $$ = $1; }
   | logical_or_expr_no_obj OR logical_and_expr_no_obj
+      { $$ = ast_make_binary("||", $1, $3); }
   ;
 
 logical_and_expr_no_obj
   : equality_expr_no_obj
+      { $$ = $1; }
   | logical_and_expr_no_obj AND equality_expr_no_obj
+      { $$ = ast_make_binary("&&", $1, $3); }
   ;
 
 equality_expr_no_obj
   : relational_expr_no_obj
+      { $$ = $1; }
   | equality_expr_no_obj EQ relational_expr_no_obj
+      { $$ = ast_make_binary("==", $1, $3); }
   | equality_expr_no_obj NE relational_expr_no_obj
+      { $$ = ast_make_binary("!=", $1, $3); }
   | equality_expr_no_obj EQ_STRICT relational_expr_no_obj
+      { $$ = ast_make_binary("===", $1, $3); }
   | equality_expr_no_obj NE_STRICT relational_expr_no_obj
+      { $$ = ast_make_binary("!==", $1, $3); }
   ;
 
 relational_expr_no_obj
   : additive_expr_no_obj
+      { $$ = $1; }
   | relational_expr_no_obj '<' additive_expr_no_obj
+      { $$ = ast_make_binary("<", $1, $3); }
   | relational_expr_no_obj '>' additive_expr_no_obj
-  | relational_expr_no_obj LE  additive_expr_no_obj
-  | relational_expr_no_obj GE  additive_expr_no_obj
+      { $$ = ast_make_binary(">", $1, $3); }
+  | relational_expr_no_obj LE additive_expr_no_obj
+      { $$ = ast_make_binary("<=", $1, $3); }
+  | relational_expr_no_obj GE additive_expr_no_obj
+      { $$ = ast_make_binary(">=", $1, $3); }
   ;
 
 additive_expr_no_obj
   : multiplicative_expr_no_obj
+      { $$ = $1; }
   | additive_expr_no_obj '+' multiplicative_expr_no_obj
+      { $$ = ast_make_binary("+", $1, $3); }
   | additive_expr_no_obj '-' multiplicative_expr_no_obj
+      { $$ = ast_make_binary("-", $1, $3); }
   ;
 
 multiplicative_expr_no_obj
   : unary_expr_no_obj
+      { $$ = $1; }
   | multiplicative_expr_no_obj '*' unary_expr_no_obj
+      { $$ = ast_make_binary("*", $1, $3); }
   | multiplicative_expr_no_obj '/' unary_expr_no_obj
+      { $$ = ast_make_binary("/", $1, $3); }
   | multiplicative_expr_no_obj '%' unary_expr_no_obj
+      { $$ = ast_make_binary("%", $1, $3); }
   ;
 
 unary_expr_no_obj
   : postfix_expr_no_obj
+      { $$ = $1; }
   | '+' unary_expr_no_obj
+      { $$ = ast_make_unary("+", $2); }
   | '-' unary_expr_no_obj %prec UMINUS
+      { $$ = ast_make_unary("-", $2); }
   | '!' unary_expr_no_obj
+      { $$ = ast_make_unary("!", $2); }
   | '~' unary_expr_no_obj
+      { $$ = ast_make_unary("~", $2); }
   | PLUS_PLUS unary_expr_no_obj
+      { $$ = ast_make_update("++", $2, true); }
   | MINUS_MINUS unary_expr_no_obj
+      { $$ = ast_make_update("--", $2, true); }
   ;
 
 postfix_expr_no_obj
   : primary_no_obj
+      { $$ = $1; }
   | postfix_expr_no_obj '.' IDENTIFIER
+      { $$ = ast_make_member($1, $3, false); }
   | postfix_expr_no_obj '(' opt_arg_list ')'
+      { $$ = ast_make_call($1, $3); }
   | postfix_expr_no_obj PLUS_PLUS
+      { $$ = ast_make_update("++", $1, false); }
   | postfix_expr_no_obj MINUS_MINUS
+      { $$ = ast_make_update("--", $1, false); }
   ;
 
 primary_no_obj
   : IDENTIFIER
+      { $$ = ast_make_identifier($1); }
   | NUMBER
+      { $$ = ast_make_number_literal($1); }
   | STRING
+      { $$ = ast_make_string_literal($1); }
   | TRUE
+      { $$ = ast_make_boolean_literal(true); }
   | FALSE
+      { $$ = ast_make_boolean_literal(false); }
   | NULL_T
+      { $$ = ast_make_null_literal(); }
   | UNDEFINED
+      { $$ = ast_make_undefined_literal(); }
   | '(' expr ')'
+      { $$ = $2; }
   | array_literal
+      { $$ = $1; }
   ;
 
 array_literal
   : '[' ']'
+      { $$ = ast_make_array_literal(NULL); }
   | '[' el_list opt_trailing_comma ']'
+      { $$ = ast_make_array_literal($2); }
   ;
 
 el_list
   : expr
+      { $$ = ast_list_append(NULL, $1); }
   | el_list ',' expr
+      { $$ = ast_list_append($1, $3); }
   ;
 
 opt_trailing_comma
@@ -308,20 +454,32 @@ opt_trailing_comma
 
 object_literal
   : '{' '}'
+      { $$ = ast_make_object_literal(NULL); }
   | '{' prop_list opt_trailing_comma '}'
+      { $$ = ast_make_object_literal($2); }
   ;
 
 prop_list
   : prop
+      { $$ = ast_list_append(NULL, $1); }
   | prop_list ',' prop
+      { $$ = ast_list_append($1, $3); }
   ;
 
 prop
   : IDENTIFIER ':' expr
+      { $$ = ast_make_property($1, true, $3); }
   | STRING ':' expr
+      { $$ = ast_make_property($1, false, $3); }
   ;
 
 %%
+
+ASTNode *parser_take_ast(void) {
+    ASTNode *root = g_parser_ast_root;
+    g_parser_ast_root = NULL;
+    return root;
+}
 
 void yyerror(const char *s) {
     fprintf(stderr, "Syntax error: %s\n", s);

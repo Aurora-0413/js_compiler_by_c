@@ -129,9 +129,11 @@ if errorlevel 1 exit /b 1
 if errorlevel 1 exit /b 1
 %GCC% -Wall -g -std=c99 -c lexer.c -o lexer.o
 if errorlevel 1 exit /b 1
+%GCC% -Wall -g -std=c99 -c ast.c -o ast.o
+if errorlevel 1 exit /b 1
 
 echo [4/4] Linking js_parser.exe...
-%GCC% -Wall -g -std=c99 -o js_parser.exe parser.o parser_main.o parser_lex_adapter.o lexer.o
+%GCC% -Wall -g -std=c99 -o js_parser.exe parser.o parser_main.o parser_lex_adapter.o lexer.o ast.o
 if errorlevel 1 (
     echo ERROR: Linking failed!
     exit /b 1

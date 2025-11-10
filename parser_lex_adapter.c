@@ -219,10 +219,12 @@ static int convert_token_type(TokenType type) {
 
 typedef struct PendingToken {
     int token;
+    YYSTYPE semantic;
+    bool has_semantic;
     bool valid;
 } PendingToken;
 
-static PendingToken g_pending = {0, false};
+static PendingToken g_pending = {0};
 
 // 由 parser_main.c 调用，设置输入缓冲区
 void parser_set_input(const char *input) {
@@ -244,6 +246,12 @@ int yylex(void) {
 
     if (g_pending.valid) {
         int tok = g_pending.token;
+        if (g_pending.has_semantic) {
+            yylval = g_pending.semantic;
+            g_pending.has_semantic = false;
+        } else {
+            memset(&yylval, 0, sizeof(yylval));
+        }
         g_pending.valid = false;
         update_token_state(tok);
         return tok;
@@ -254,6 +262,16 @@ int yylex(void) {
         bool newline_before = g_lexer.has_newline;
         int mapped = convert_token_type(tk.type);
         bool is_eof = (tk.type == TOK_EOF);
+
+        YYSTYPE semantic;
+        memset(&semantic, 0, sizeof(semantic));
+        bool has_semantic = false;
+
+        if (tk.type == TOK_IDENTIFIER || tk.type == TOK_STRING || tk.type == TOK_NUMBER) {
+            semantic.str = tk.value;
+            tk.value = NULL;
+            has_semantic = (semantic.str != NULL);
+        }
 
         if (mapped < 0) {
             fprintf(stderr, "Lexical error at line %d, column %d\n", tk.line, tk.column);
@@ -266,8 +284,19 @@ int yylex(void) {
         if (should_insert_semicolon(g_last_token, g_last_token_closed_control, mapped, newline_before, is_eof)) {
             g_pending.token = mapped;
             g_pending.valid = true;
+            g_pending.has_semantic = has_semantic;
+            if (has_semantic) {
+                g_pending.semantic = semantic;
+            }
             update_token_state(';');
+            memset(&yylval, 0, sizeof(yylval));
             return ';';
+        }
+
+        if (has_semantic) {
+            yylval = semantic;
+        } else {
+            memset(&yylval, 0, sizeof(yylval));
         }
 
         update_token_state(mapped);

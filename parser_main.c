@@ -11,6 +11,10 @@ int yyparse(void);
 // 适配层提供：设置输入缓冲区
 void parser_set_input(const char *input);
 
+#include "ast.h"
+
+ASTNode *parser_take_ast(void);
+
 static char *read_file(const char *filename) {
     FILE *file = fopen(filename, "rb");
     if (!file) {
@@ -33,27 +37,48 @@ static char *read_file(const char *filename) {
 }
 
 int main(int argc, char **argv) {
-    if (argc < 2) {
+    int dump_ast = 0;
+    const char *filename = NULL;
+
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "--dump-ast") == 0) {
+            dump_ast = 1;
+        } else if (!filename) {
+            filename = argv[i];
+        } else {
+            fprintf(stderr, "Unknown argument: %s\n", argv[i]);
+            fprintf(stderr, "Usage: %s [--dump-ast] <javascript_file>\n", argv[0]);
+            return 1;
+        }
+    }
+
+    if (!filename) {
         printf("JavaScript Parser - Syntax Checker\n");
-        printf("Usage: %s <javascript_file>\n", argv[0]);
+        printf("Usage: %s [--dump-ast] <javascript_file>\n", argv[0]);
         return 1;
     }
 
-    const char *filename = argv[1];
     char *input = read_file(filename);
     if (!input) return 1;
 
     parser_set_input(input);
 
     int rc = yyparse();
+    ASTNode *root = parser_take_ast();
 
     free(input);
 
     if (rc == 0) {
+        if (dump_ast && root) {
+            printf("=== AST Dump ===\n");
+            ast_print(root);
+        }
         printf("Parsing successful! Input file: %s\n", filename);
+        ast_free(root);
         return 0;
     } else {
         printf("Parsing failed. Input file: %s\n", filename);
+        ast_free(root);
         return 2;
     }
 }

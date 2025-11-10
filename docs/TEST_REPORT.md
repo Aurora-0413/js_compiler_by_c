@@ -58,6 +58,7 @@
 - 成员访问（对象属性）
 - 运算符优先级和结合性
 - 块作用域与对象字面量歧义消解
+- 抽象语法树构建与 `--dump-ast` 缩进打印
 
 **测试结果:**
 
@@ -143,6 +144,17 @@
   - `if/else` 链式结构与 ASI 共存
 
 结果: ✅ Parsing successful!
+```
+
+#### 测试 8: AST 输出烟囱 ✅
+
+```text
+命令: .\js_parser.exe --dump-ast tests\test_basic.js
+包含内容:
+  - Program/Block/ForStatement 等节点层级
+  - 数组、对象、更新表达式等结构
+
+结果: ✅ AST dump 输出完整，层级符合预期
 ```
 
 ## 编译警告分析

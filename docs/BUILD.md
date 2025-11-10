@@ -3,7 +3,7 @@
 本项目包含两个可执行程序：
 
 - **js_lexer.exe** - 词法分析器（Token 流输出，用于调试）
-- **js_parser.exe** - 语法分析器（语法验证，报告成功/失败）
+- **js_parser.exe** - 语法分析器与 AST 构建器（语法验证，可选输出抽象语法树）
 
 ## 构建项目
 
@@ -84,7 +84,7 @@ Total tokens: 106
 
 ### 语法分析器 (js_parser.exe)
 
-验证 JavaScript 语法，报告成功或详细错误信息。
+验证 JavaScript 语法，报告成功或详细错误信息；使用 `--dump-ast` 选项可输出抽象语法树。
 
 ```bash
 # 分析 JavaScript 文件
@@ -95,6 +95,9 @@ Total tokens: 106
 
 # 测试语法错误的文件
 .\js_parser.exe tests\test_error_object.js
+
+# 输出 AST 结构
+.\js_parser.exe --dump-ast tests\test_basic.js
 ```
 
 **成功示例：**
@@ -112,9 +115,11 @@ Parsing successful! Input file: tests\test_basic.js
   2. 输入流结束（EOF）。
   3. 受限产生式（`return` / `break` / `continue` / `throw`）后遇到换行或文件结束。
 - **关键实现**：`parser_lex_adapter.c` 通过 `lexer->has_newline` 标志、上一 Token 记录以及控制语句括号栈在必要时注入虚拟分号。
-- **典型场景**：`a
-+b` 会被拆分为 `a; ++b`，`return
-  **错误示例：**
+- **典型场景**：
+  - `a\n++b` 会被拆分为 `a; ++b`
+  - `return\nvalue` 会被解析为 `return; value`
+  - `if (flag)\nreturn value` 在 `if` 结构内不会多插分号
+- **错误示例：**
 
 运行 `build.bat test-parse` 或 `make test-parse` 可一次性验证基础语法与 ASI 相关用例。
 
@@ -199,6 +204,14 @@ Syntax error: syntax error, unexpected STRING, expecting ':'
 - 正确区分块 `{...}` 和对象字面量 `{...}`
 - 使用 `expr_no_obj` 变体避免表达式语句歧义
 
+### ✅ 抽象语法树 (AST)
+
+- `ast.h` / `ast.c` 定义统一的 AST 节点类型与构造函数。
+- `parser.y` 的语义动作会为程序、语句与表达式创建节点，并串联成完整的树结构。
+- `ast_print` 支持缩进输出，配合 `js_parser.exe --dump-ast` 可快速检查语义结构。
+- `ast_traverse` 提供深度优先遍历回调，便于后续实现代码生成或静态分析。
+- `ast_free` 负责递归释放所有节点，避免内存泄漏。
+
 ## 编译警告说明
 
 构建过程中会出现以下警告，这些警告**不影响功能**：
@@ -234,11 +247,9 @@ lexer.re:89:25: warning: unused variable 'comment_start'
 
 ## 下一步开发计划
 
-### 优先级 P2 - AST 构建
+### ✅ 优先级 P2 - AST 构建
 
-- [ ] 在 parser.y 的语义动作中创建 AST 节点
-- [ ] 实现 AST 节点的打印函数
-- [ ] 实现 AST 节点的内存管理
+- AST 节点体系与打印、遍历、释放流程已落地，详见 `ast.h` / `ast.c`，并可通过 `js_parser.exe --dump-ast` 体验树形输出。
 
 ### 优先级 P3 - 扩展语句覆盖
 
@@ -291,6 +302,7 @@ js_compiler_by_c/
 ├── parser.c / parser.h       # Bison 生成的 C 代码（自动生成，勿编辑）
 ├── parser_main.c             # 语法分析器主程序
 ├── parser_lex_adapter.c      # 词法-语法适配层
+├── ast.h / ast.c             # AST 结构定义、构造、打印与释放
 ├── build.bat                 # Windows 构建脚本
 ├── Makefile                  # Make 构建脚本
 ├── BUILD.md                  # 本文档
