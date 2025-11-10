@@ -146,7 +146,40 @@
 结果: ✅ Parsing successful!
 ```
 
-#### 测试 8: AST 输出烟囱 ✅
+#### 测试 8: 循环与标签语句 ✅
+
+```text
+测试文件: tests\test_while.js
+包含内容:
+  - while / do-while 语句
+  - 标签语句与带标签的 break/continue
+
+结果: ✅ Parsing successful!
+```
+
+#### 测试 9: switch-case 控制流 ✅
+
+```text
+测试文件: tests\test_switch.js
+包含内容:
+  - 多个 case 分支与 default
+  - fall-through 与 break 混合场景
+
+结果: ✅ Parsing successful!
+```
+
+#### 测试 10: try-catch-finally 与 with ✅
+
+```text
+测试文件: tests\test_try.js
+包含内容:
+  - try/catch/finally 组合
+  - with 语句与对象上下文绑定
+
+结果: ✅ Parsing successful!
+```
+
+#### 附加验证: AST 输出烟囱 ✅
 
 ```text
 命令: .\js_parser.exe --dump-ast tests\test_basic.js
@@ -156,6 +189,14 @@
 
 结果: ✅ AST dump 输出完整，层级符合预期
 ```
+
+### 问题回顾与解决
+
+- **with 语句解析失败（已解决）**
+  - **触发场景**: `tests/test_try.js` 在执行 `build.bat test-parse` 时提示 `unexpected ';', expecting '}'`。
+  - **原因分析**: 适配层 ASI 逻辑在对象字面量闭合 `}` 前错误插入分号，破坏了 `with` 语句块结构。
+  - **修复措施**: 在 `parser_lex_adapter.c` 引入括号类型栈，区分语句块与对象字面量，仅对语句块允许自动插入分号。
+  - **验证结果**: 重新执行 `build.bat test-parse`，全部 10 个测试文件通过，`tests/test_try.js` 正常解析。
 
 ## 编译警告分析
 
@@ -192,13 +233,17 @@ lexer.re:89:25: warning: unused variable 'comment_start'
 ### ✅ 支持的语句
 
 - [x] 变量声明（var, let, const）
-- [x] 表达式语句
+- [x] 表达式语句与空语句 `;`
 - [x] 块语句 `{ ... }`
-- [x] if-else 条件语句
+- [x] if / if-else 条件语句
 - [x] for 循环（经典三段式）
-- [x] 函数声明
-- [x] return 语句
-- [x] 空语句 `;`
+- [x] while / do-while 循环
+- [x] switch-case / default 控制流
+- [x] try-catch-finally 异常处理
+- [x] with 语句
+- [x] 标签语句与带标签的 break / continue
+- [x] break / continue / throw（含受限产生式）
+- [x] 函数声明与 return 语句
 
 ### ✅ 支持的表达式
 
@@ -221,11 +266,10 @@ lexer.re:89:25: warning: unused variable 'comment_start'
 
 ## 尚未实现的功能
 
-### ⏳ 待实现（优先级 P2-P5）
+### ⏳ 待实现（优先级 P4-P5）
 
-- [ ] AST 节点构建（当前仅语法检查）
-- [ ] 更多语句类型（while, do-while, switch, try-catch）
-- [ ] 完整运算符支持（三元运算符 `?:`、位运算、复合赋值）
+- [ ] 完整运算符支持（三元运算符 `?:`、位运算、复合赋值、逗号运算符）
+- [ ] 一元关键字运算符扩展（typeof、delete、void）
 - [ ] 正则表达式字面量
 - [ ] 模板字符串
 - [ ] ES6+ 特性（箭头函数、类、async/await 等）
@@ -254,13 +298,14 @@ lexer.re:89:25: warning: unused variable 'comment_start'
 
 ## 测试覆盖率总结
 
-| 功能类别 | 测试数量 | 通过数量 | 覆盖率   |
-| -------- | -------- | -------- | -------- |
-| 词法分析 | 1        | 1        | 100%     |
-| 基本语法 | 2        | 2        | 100%     |
-| ASI 行为 | 3        | 3        | 100%     |
-| 错误检测 | 2        | 2        | 100%     |
-| **总计** | **8**    | **8**    | **100%** |
+| 功能类别   | 测试数量 | 通过数量 | 覆盖率   |
+| ---------- | -------- | -------- | -------- |
+| 词法分析   | 1        | 1        | 100%     |
+| 基本语法   | 2        | 2        | 100%     |
+| ASI 行为   | 3        | 3        | 100%     |
+| 控制流扩展 | 3        | 3        | 100%     |
+| 错误检测   | 2        | 2        | 100%     |
+| **总计**   | **11**   | **11**   | **100%** |
 
 ## 结论
 
@@ -279,17 +324,23 @@ lexer.re:89:25: warning: unused variable 'comment_start'
 
 下一步建议：
 
-1. **优先实现 ASI 机制**，使解析器更符合 JavaScript 规范
-2. **构建 AST**，为后续的语义分析和代码生成做准备
-3. **扩展语句覆盖**，支持更多 JavaScript 语法特性
+1. **推进运算符完整性（P4）**：实现三元、位运算与复合赋值，完善一元关键字运算符。
+2. **扩充测试矩阵**：按运算符类别新增正/负向用例，并将 `build.bat test-parse` 集成到 CI。
+3. **解决遗留警告**：处理 re2c sentinel 配置、Bison 冲突校准与未使用变量清理。
 
 ## 测试文件清单
 
+- `js_lexer.exe tests/test_basic.js` - 词法分析输出检查 ✅
 - `tests/test_basic.js` - 综合基本语法测试 ✅
-- `tests/test_simple.js` - 简单功能测试 ✅
+- `tests/test_simple.js` - 简单函数与表达式测试 ✅
+- `tests/test_asi_basic.js` - ASI 基础语句覆盖 ✅
+- `tests/test_asi_return.js` - 受限产生式（return）测试 ✅
+- `tests/test_asi_control.js` - ASI 与控制流协同测试 ✅
+- `tests/test_while.js` - while/do-while + 标签跳转测试 ✅
+- `tests/test_switch.js` - switch-case/default 控制流测试 ✅
+- `tests/test_try.js` - try/catch/finally + with 组合测试 ✅
 - `tests/test_error_missing_semicolon.js` - 缺少分号错误测试 ✅
-- `tests/test_error_object.js` - 对象字面量错误测试 ✅
-- `tests/test_error_cases.js` - 错误用例集合（已存在）
+- `tests/test_error_object.js` - 对象字面量缺冒号错误测试 ✅
 
 ---
 

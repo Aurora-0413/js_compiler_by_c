@@ -184,6 +184,14 @@ ASI (Automatic Semicolon Insertion) 是 JavaScript 的核心特性，允许省�
   - 实现 `IDENTIFIER ':' stmt`、`break label`、`continue label`
   - `tests/test_while.js` 验证带标签跳转
 
+### 问题与修复记录（P3）
+
+- **with 语句解析失败（已解决）**
+  - **现象**: `tests/test_try.js` 在解析 `with (obj) { ... }` 时抛出 `unexpected ';', expecting '}'` 错误。
+  - **原因**: 适配层的 ASI 逻辑在对象字面量的闭合 `}` 前误插入分号，导致解析堆栈提前结束。
+  - **修复**: 在 `parser_lex_adapter.c` 新增括号类型栈，区分语句块与对象字面量；仅在退出语句块时允许自动插入分号，避免对象字面量被破坏。
+  - **验证**: `build.bat test-parse` 全量通过，`tests/test_try.js` 成功覆盖 try/catch/finally + with 组合场景。
+
 ### 技术要点
 
 - 词法分析器原生支持相关关键字，无需额外修改。
