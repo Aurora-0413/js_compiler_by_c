@@ -12,10 +12,13 @@ int yylex(void);
 void yyerror(const char *s);
 
 static ASTNode *g_parser_ast_root = NULL;
+static int g_parser_error_count = 0;
 %}
 
 %code provides {
     ASTNode *parser_take_ast(void);
+    void parser_reset_error_count(void);
+    int parser_error_count(void);
 }
 
 %code requires {
@@ -734,5 +737,14 @@ ASTNode *parser_take_ast(void) {
 }
 
 void yyerror(const char *s) {
-    fprintf(stderr, "Syntax error: %s\n", s);
+    g_parser_error_count++;
+    fprintf(stderr, "Syntax error #%d: %s\n", g_parser_error_count, s);
+}
+
+void parser_reset_error_count(void) {
+    g_parser_error_count = 0;
+}
+
+int parser_error_count(void) {
+    return g_parser_error_count;
 }

@@ -14,6 +14,8 @@ void parser_set_input(const char *input);
 #include "ast.h"
 
 ASTNode *parser_take_ast(void);
+void parser_reset_error_count(void);
+int parser_error_count(void);
 
 static char *read_file(const char *filename) {
     FILE *file = fopen(filename, "rb");
@@ -61,24 +63,29 @@ int main(int argc, char **argv) {
     char *input = read_file(filename);
     if (!input) return 1;
 
+    parser_reset_error_count();
     parser_set_input(input);
 
     int rc = yyparse();
     ASTNode *root = parser_take_ast();
+    int error_count = parser_error_count();
 
     free(input);
 
-    if (rc == 0) {
+    if (rc == 0 && error_count == 0) {
         if (dump_ast && root) {
             printf("=== AST Dump ===\n");
             ast_print(root);
         }
-        printf("Parsing successful! Input file: %s\n", filename);
+    printf("[PASS] %s - no syntax errors detected.\n", filename);
         ast_free(root);
         return 0;
-    } else {
-        printf("Parsing failed. Input file: %s\n", filename);
-        ast_free(root);
-        return 2;
     }
+
+    fprintf(stderr, "[FAIL] %s - %d syntax error%s detected. See messages above.\n",
+            filename,
+            error_count,
+            error_count == 1 ? "" : "s");
+    ast_free(root);
+    return 2;
 }
