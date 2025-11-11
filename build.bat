@@ -2,9 +2,10 @@
 setlocal enabledelayedexpansion
 REM JavaScript 词法分析器构建脚本 (Windows)
 
-set GCC=D:\mingw64\bin\gcc.exe
-set RE2C=re2c
-set BISON=bison
+
+set "GCC=C:\Program Files (x86)\mingw64\bin\gcc.exe"
+set "RE2C=E:\Application\MSYS2\usr\bin\re2c.exe"
+set "BISON=E:\Application\MSYS2\usr\bin\bison.exe"
 set TARGET=js_lexer.exe
 
 echo ================================================
@@ -21,7 +22,7 @@ if "%1"=="test-parse" goto testparse
 
 :build
 echo [1/3] Generating lexer.c from lexer.re...
-%RE2C% -o lexer.c lexer.re
+"%RE2C%" -o lexer.c lexer.re
 if errorlevel 1 (
     echo ERROR: re2c failed!
     exit /b 1
@@ -30,12 +31,12 @@ echo       Generated lexer.c successfully.
 echo.
 
 echo [2/3] Compiling source files...
-%GCC% -Wall -g -std=c99 -c main.c -o main.o
+"%GCC%" -Wall -g -std=c99 -c main.c -o main.o
 if errorlevel 1 (
     echo ERROR: Failed to compile main.c
     exit /b 1
 )
-%GCC% -Wall -g -std=c99 -c lexer.c -o lexer.o
+"%GCC%" -Wall -g -std=c99 -c lexer.c -o lexer.o
 if errorlevel 1 (
     echo ERROR: Failed to compile lexer.c
     exit /b 1
@@ -44,7 +45,7 @@ echo       Compiled successfully.
 echo.
 
 echo [3/3] Linking...
-%GCC% -Wall -g -std=c99 -o %TARGET% main.o lexer.o
+"%GCC%" -Wall -g -std=c99 -o %TARGET% main.o lexer.o
 if errorlevel 1 (
     echo ERROR: Linking failed!
     exit /b 1
@@ -108,33 +109,33 @@ echo ================================================
 echo.
 
 echo [1/4] Generating lexer.c from lexer.re...
-%RE2C% -o lexer.c lexer.re
+"%RE2C%" -o lexer.c lexer.re
 if errorlevel 1 (
     echo ERROR: re2c failed!
     exit /b 1
 )
 
 echo [2/4] Generating parser.c / parser.h from parser.y...
-%BISON% -d -o parser.c parser.y
+"%BISON%" -d -o parser.c parser.y
 if errorlevel 1 (
     echo ERROR: bison failed!
     exit /b 1
 )
 
 echo [3/4] Compiling sources...
-%GCC% -Wall -g -std=c99 -c parser.c -o parser.o
+"%GCC%" -Wall -g -std=c99 -c parser.c -o parser.o
 if errorlevel 1 exit /b 1
-%GCC% -Wall -g -std=c99 -c parser_main.c -o parser_main.o
+"%GCC%" -Wall -g -std=c99 -c parser_main.c -o parser_main.o
 if errorlevel 1 exit /b 1
-%GCC% -Wall -g -std=c99 -c parser_lex_adapter.c -o parser_lex_adapter.o
+"%GCC%" -Wall -g -std=c99 -c parser_lex_adapter.c -o parser_lex_adapter.o
 if errorlevel 1 exit /b 1
-%GCC% -Wall -g -std=c99 -c lexer.c -o lexer.o
+"%GCC%" -Wall -g -std=c99 -c lexer.c -o lexer.o
 if errorlevel 1 exit /b 1
-%GCC% -Wall -g -std=c99 -c ast.c -o ast.o
+"%GCC%" -Wall -g -std=c99 -c ast.c -o ast.o
 if errorlevel 1 exit /b 1
 
 echo [4/4] Linking js_parser.exe...
-%GCC% -Wall -g -std=c99 -o js_parser.exe parser.o parser_main.o parser_lex_adapter.o lexer.o ast.o
+"%GCC%" -Wall -g -std=c99 -o js_parser.exe parser.o parser_main.o parser_lex_adapter.o lexer.o ast.o
 if errorlevel 1 (
     echo ERROR: Linking failed!
     exit /b 1
