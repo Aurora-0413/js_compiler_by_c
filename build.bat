@@ -1,11 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
-REM JavaScript 词法分析器构建脚本 (Windows)
+REM JavaScript Lexer Build Script (Windows)
 
-
-set "GCC=C:\Program Files (x86)\mingw64\bin\gcc.exe"
-set "RE2C=E:\Application\MSYS2\usr\bin\re2c.exe"
-set "BISON=E:\Application\MSYS2\usr\bin\bison.exe"
+set "GCC=D:\environment\mingw64\bin\gcc.exe"
+set "RE2C=D:\environment\msys2\usr\bin\re2c.exe"
+set "BISON=D:\environment\msys2\usr\bin\bison.exe"
 set TARGET=js_lexer.exe
 
 echo ================================================
@@ -13,7 +12,7 @@ echo JavaScript Lexer - Build Script
 echo ================================================
 echo.
 
-REM 检查参数
+REM Check parameters
 if "%1"=="clean" goto clean
 if "%1"=="test" goto test
 if "%1"=="help" goto help
@@ -159,24 +158,24 @@ set TOTAL=0
 set PASSED=0
 set FAILED=0
 
-REM 遍历 tests 文件夹中的所有 .js 文件
+REM Iterate all .js files in tests folder
 for %%F in (tests\*.js) do (
     set /a TOTAL+=1
     
-    REM 检查是否是错误测试用例（文件名包含 test_error 或 temp）
+    REM Check if error test case (filename contains test_error or temp)
     set EXPECT_FAIL=0
     echo %%F | findstr /i "test_error temp" >nul
     if not errorlevel 1 set EXPECT_FAIL=1
     
     echo Running parser test: %%F
     
-    REM 执行测试并捕获退出码
+    REM Execute test and capture exit code
     js_parser.exe %%F
     set RESULT=!errorlevel!
     
-    REM 判断测试结果
+    REM Check test result
     if !EXPECT_FAIL! equ 1 (
-        REM 期望失败的测试
+        REM Expected to fail
         if !RESULT! equ 0 (
             echo   [debug] result=!RESULT!, expect_fail=!EXPECT_FAIL!
             echo   Expected failure but parser succeeded.
@@ -186,7 +185,7 @@ for %%F in (tests\*.js) do (
             set /a PASSED+=1
         )
     ) else (
-        REM 期望成功的测试
+        REM Expected to succeed
         if !RESULT! equ 0 (
             echo   [debug] result=!RESULT!, expect_fail=!EXPECT_FAIL!
             set /a PASSED+=1
