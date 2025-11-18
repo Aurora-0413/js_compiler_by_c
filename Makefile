@@ -1,161 +1,262 @@
-# JavaScript 词法/语法分析器 Makefile
-# 适用于 Windows + MinGW 环境
+# ============================================================================
+# JavaScript Compiler - Makefile
+# 优化版构建脚本，支持模块化编译和增量构建
+# ============================================================================
 
+# 编译器配置
 CC = gcc
-CFLAGS = -Wall -g -std=c99
 RE2C = re2c
 BISON = bison
 
-########################
-# 目标可执行文件
-########################
-LEXER_TARGET  = js_lexer.exe
-PARSER_TARGET = js_parser.exe
+# 目录配置
+SRC_DIR = src
+INC_DIR = include
+BUILD_DIR = build
+LEXER_DIR = $(SRC_DIR)/lexer
+PARSER_DIR = $(SRC_DIR)/parser
+AST_DIR = $(SRC_DIR)/ast
+UTILS_DIR = $(SRC_DIR)/utils
+TEST_DIR = tests
 
-########################
+# 编译选项
+CFLAGS = -Wall -Wextra -I$(INC_DIR) -std=c99 -O2
+DEBUG_FLAGS = -g -DDEBUG
+LDFLAGS =
+
+# 生成文件
+LEXER_GEN = $(BUILD_DIR)/lexer.c
+PARSER_GEN_C = $(BUILD_DIR)/parser.c
+PARSER_GEN_H = $(BUILD_DIR)/parser.h
+
 # 源文件
-########################
-LEXER_SOURCES  = main.c lexer.c
-LEXER_OBJECTS  = $(LEXER_SOURCES:.c=.o)
+LEXER_RE = $(LEXER_DIR)/lexer.re
+PARSER_Y = $(PARSER_DIR)/parser.y
+TOKEN_C = $(LEXER_DIR)/token.c
+PARSER_ADAPTER_C = $(PARSER_DIR)/parser_adapter.c
+AST_C = $(AST_DIR)/ast.c
+UTILS_C = $(UTILS_DIR)/utils.c
 
-PARSER_SOURCES = parser.c parser_main.c parser_lex_adapter.c lexer.c ast.c
-PARSER_OBJECTS = $(PARSER_SOURCES:.c=.o)
+# 目标文件
+LEXER_OBJS = $(BUILD_DIR)/lexer.o $(BUILD_DIR)/token.o $(BUILD_DIR)/utils.o
+PARSER_OBJS = $(BUILD_DIR)/parser.o $(BUILD_DIR)/parser_adapter.o \
+              $(BUILD_DIR)/ast.o $(BUILD_DIR)/token.o $(BUILD_DIR)/utils.o
 
-# 默认目标
-all: $(LEXER_TARGET)
+# 可执行文件
+LEXER_EXE = js_lexer.exe
+PARSER_EXE = js_parser.exe
 
-# 单独构建语法解析器
-parser: $(PARSER_TARGET)
+# 测试文件
+TEST_FILES = $(wildcard $(TEST_DIR)/test_*.js)
 
-# 生成词法分析器 C 代码
-lexer.c: lexer.re
-	@echo "Generating lexer.c from lexer.re..."
-	$(RE2C) -o lexer.c lexer.re
+# ============================================================================
+# 主目标
+# ============================================================================
 
-# 生成语法分析器 C 代码
-parser.c parser.h: parser.y
-	@echo "Generating parser.c/parser.h from parser.y..."
-	$(BISON) -d -o parser.c parser.y
+.PHONY: all clean lexer parser test-lexer test-parser help
 
-# 编译词法分析可执行程序
-$(LEXER_TARGET): $(LEXER_OBJECTS)
-	@echo "Linking $(LEXER_TARGET)..."
-	$(CC) $(CFLAGS) -o $(LEXER_TARGET) $(LEXER_OBJECTS)
-	@echo "Build complete: $(LEXER_TARGET)"
+all: parser
 
-# 确保适配层在编译时已生成 parser.h
-parser_lex_adapter.o: parser_lex_adapter.c parser.h token.h
-	@echo "Compiling $<..."
-	$(CC) $(CFLAGS) -c $< -o $@
+# 词法分析器
+lexer: $(LEXER_EXE)
 
-# 明确依赖，避免并行/顺序导致缺少头文件
-parser_main.o: parser_main.c parser.h ast.h
-	@echo "Compiling $<..."
-	$(CC) $(CFLAGS) -c $< -o $@
+# 语法分析器（包含词法分析器）
+parser: $(PARSER_EXE)
 
-# 编译语法解析可执行程序
-$(PARSER_TARGET): parser.h $(PARSER_OBJECTS)
-	@echo "Linking $(PARSER_TARGET)..."
-	$(CC) $(CFLAGS) -o $(PARSER_TARGET) $(PARSER_OBJECTS)
-	@echo "Build complete: $(PARSER_TARGET)"
+# ============================================================================
+# 构建规则
+# ============================================================================
 
-# 编译 .c 文件为 .o 文件
-%.o: %.c token.h
-	@echo "Compiling $<..."
-	$(CC) $(CFLAGS) -c $< -o $@
+# 创建构建目录
+$(BUILD_DIR):
+	@mkdir -p $(BUILD_DIR)
 
-# 清理生成的文件
-clean:
-	@echo "Cleaning up..."
-	@rm -f lexer.c parser.c parser.h *.o $(LEXER_TARGET) $(PARSER_TARGET)
-	@echo "Clean complete"
+# 生成词法分析器源码
+$(LEXER_GEN): $(LEXER_RE) | $(BUILD_DIR)
+	@echo "[RE2C] Generating lexer from $(LEXER_RE)..."
+	$(RE2C) -o $@ $(LEXER_RE)
 
-# 创建测试目录和示例文件
-test-setup:
-	@mkdir -p tests
-	@printf "var x = 10;\n" > tests/test_basic.js
-	@printf "let y = 20;\n" >> tests/test_basic.js
-	@printf "const z = 30;\n" >> tests/test_basic.js
-	@printf "function add(a, b) { return a + b; }\n" >> tests/test_basic.js
-	@printf "console.log(\"Test complete\");\n" >> tests/test_basic.js
-	@echo Test files created in tests/ directory
+# 生成语法分析器源码
+$(PARSER_GEN_C) $(PARSER_GEN_H): $(PARSER_Y) | $(BUILD_DIR)
+	@echo "[BISON] Generating parser from $(PARSER_Y)..."
+	$(BISON) -d -o $(PARSER_GEN_C) $(PARSER_Y)
 
-# 运行测试
-test-lex: $(LEXER_TARGET) test-setup
-	@echo.
-	@echo === Running Lexer Test: tests/test_basic.js ===
-	@./$(LEXER_TARGET) tests/test_basic.js
-	@echo.
+# 编译词法分析器目标文件
+$(BUILD_DIR)/lexer.o: $(LEXER_GEN) $(INC_DIR)/token.h
+	@echo "[CC] Compiling lexer..."
+	$(CC) $(CFLAGS) -c $(LEXER_GEN) -o $@
 
-test-parse: $(PARSER_TARGET)
-	@echo ""
-	@echo "================================================"
-	@echo "Running All Tests in tests/ folder"
-	@echo "================================================"
-	@echo ""
-	@total=0; passed=0; failed=0; \
-	for f in tests/*.js; do \
-		total=$$((total + 1)); \
-		expect_fail=0; \
-		case "$$f" in \
-			*test_error*|*temp*) \
-				expect_fail=1; \
-				;; \
-		esac; \
-		echo "Running parser test: $$f"; \
-		if ./$(PARSER_TARGET) $$f; then \
-			result=0; \
+# 编译 Token 实现
+$(BUILD_DIR)/token.o: $(TOKEN_C) $(INC_DIR)/token.h
+	@echo "[CC] Compiling token..."
+	$(CC) $(CFLAGS) -c $(TOKEN_C) -o $@
+
+# 编译工具函数
+$(BUILD_DIR)/utils.o: $(UTILS_C) $(INC_DIR)/utils.h
+	@echo "[CC] Compiling utils..."
+	$(CC) $(CFLAGS) -c $(UTILS_C) -o $@
+
+# 编译语法分析器目标文件
+$(BUILD_DIR)/parser.o: $(PARSER_GEN_C) $(PARSER_GEN_H) $(INC_DIR)/ast.h
+	@echo "[CC] Compiling parser..."
+	$(CC) $(CFLAGS) -I$(BUILD_DIR) -c $(PARSER_GEN_C) -o $@
+
+# 编译适配层
+$(BUILD_DIR)/parser_adapter.o: $(PARSER_ADAPTER_C) $(PARSER_GEN_H) \
+                                 $(INC_DIR)/token.h $(INC_DIR)/parser_adapter.h
+	@echo "[CC] Compiling parser adapter..."
+	$(CC) $(CFLAGS) -I$(BUILD_DIR) -c $(PARSER_ADAPTER_C) -o $@
+
+# 编译 AST 实现
+$(BUILD_DIR)/ast.o: $(AST_C) $(INC_DIR)/ast.h
+	@echo "[CC] Compiling AST..."
+	$(CC) $(CFLAGS) -c $(AST_C) -o $@
+
+# 链接词法分析器可执行文件
+$(LEXER_EXE): main.c $(LEXER_OBJS)
+	@echo "[LD] Linking lexer executable..."
+	$(CC) $(CFLAGS) main.c $(LEXER_OBJS) -o $@ $(LDFLAGS)
+	@echo "✓ Lexer built successfully: $(LEXER_EXE)"
+
+# 链接语法分析器可执行文件
+$(PARSER_EXE): parser_main.c $(PARSER_OBJS)
+	@echo "[LD] Linking parser executable..."
+	$(CC) $(CFLAGS) -I$(BUILD_DIR) parser_main.c $(PARSER_OBJS) -o $@ $(LDFLAGS)
+	@echo "✓ Parser built successfully: $(PARSER_EXE)"
+
+# ============================================================================
+# 测试目标
+# ============================================================================
+
+# 测试词法分析器
+test-lexer: $(LEXER_EXE)
+	@echo "\n========== Testing Lexer =========="
+	@for test in $(TEST_FILES); do \
+		echo "\n--- Testing $$test ---"; \
+		./$(LEXER_EXE) $$test || exit 1; \
+	done
+	@echo "\n✓ All lexer tests passed!"
+
+# 测试语法分析器
+test-parser: $(PARSER_EXE)
+	@echo "\n========== Testing Parser =========="
+	@passed=0; failed=0; \
+	for test in $(TEST_FILES); do \
+		echo -n "Testing $$test ... "; \
+		if ./$(PARSER_EXE) $$test > /dev/null 2>&1; then \
+			echo "✓ PASS"; \
+			passed=$$((passed + 1)); \
 		else \
-			result=$$?; \
-		fi; \
-		echo "  [debug] result=$$result, expect_fail=$$expect_fail"; \
-		if [ $$expect_fail -eq 1 ]; then \
-			if [ $$result -eq 0 ]; then \
-				echo "  Expected failure but parser succeeded."; \
-				failed=$$((failed + 1)); \
-			else \
-				passed=$$((passed + 1)); \
-			fi; \
-		else \
-			if [ $$result -eq 0 ]; then \
-				passed=$$((passed + 1)); \
-			else \
-				echo "  Expected success but parser failed."; \
-				failed=$$((failed + 1)); \
-			fi; \
+			echo "✗ FAIL"; \
+			failed=$$((failed + 1)); \
 		fi; \
 	done; \
-	echo ""; \
-	echo "================================================"; \
-	echo "Test Results Summary"; \
-	echo "================================================"; \
-	echo "Total files:     $$total"; \
-	echo "Passed:          $$passed"; \
-	echo "Failed:          $$failed"; \
-	echo "================================================"; \
-	echo ""; \
-	if [ $$failed -gt 0 ]; then \
-		echo "TEST SUITE FAILED - $$failed test(s) failed"; \
-		exit 1; \
+	echo "\n========== Test Summary =========="; \
+	echo "Passed: $$passed"; \
+	echo "Failed: $$failed"; \
+	if [ $$failed -eq 0 ]; then \
+		echo "✓ All parser tests passed!"; \
 	else \
-		echo "TEST SUITE PASSED - All $$passed test(s) passed"; \
+		exit 1; \
 	fi
 
-# 帮助信息
+# 详细测试（显示所有输出）
+test-verbose: $(PARSER_EXE)
+	@echo "\n========== Testing Parser (Verbose) =========="
+	@for test in $(TEST_FILES); do \
+		echo "\n========== Testing $$test =========="; \
+		./$(PARSER_EXE) $$test; \
+	done
+
+# 测试 AST 输出
+test-ast: $(PARSER_EXE)
+	@echo "\n========== Testing AST Dump =========="
+	@for test in $(TEST_FILES); do \
+		echo "\n========== AST for $$test =========="; \
+		./$(PARSER_EXE) --dump-ast $$test; \
+	done
+
+# ============================================================================
+# 调试目标
+# ============================================================================
+
+# 调试模式构建
+debug: CFLAGS += $(DEBUG_FLAGS)
+debug: clean all
+	@echo "✓ Debug build complete"
+
+# 只编译不链接（快速语法检查）
+syntax-check:
+	@echo "Checking syntax..."
+	$(CC) $(CFLAGS) -fsyntax-only main.c parser_main.c
+
+# ============================================================================
+# 清理目标
+# ============================================================================
+
+# 清理所有生成文件
+clean:
+	@echo "Cleaning build artifacts..."
+	@rm -rf $(BUILD_DIR)
+	@rm -f $(LEXER_EXE) $(PARSER_EXE)
+	@rm -f *.o lexer.c parser.c parser.h
+	@echo "✓ Clean complete"
+
+# 只清理目标文件（保留可执行文件）
+clean-obj:
+	@echo "Cleaning object files..."
+	@rm -rf $(BUILD_DIR)/*.o
+	@echo "✓ Object files cleaned"
+
+# ============================================================================
+# 信息目标
+# ============================================================================
+
+# 显示帮助信息
 help:
-	@echo JavaScript Lexer/Parser - Makefile Commands:
-	@echo   make          - Build the lexer (default)
-	@echo   make all      - Same as 'make'
-	@echo   make clean    - Remove generated files
-	@echo   make parser   - Build the parser (js_parser.exe)
-	@echo   make test-lex - Build and run lexer against sample
-	@echo   make test-parse - Build and run parser against sample
-	@echo   make help     - Show this help message
-	@echo.
-	@echo Usage:
-	@echo   ./js_lexer.exe filename.js
-	@echo   ./js_parser.exe filename.js
+	@echo "JavaScript Compiler - Build System"
+	@echo "===================================="
+	@echo ""
+	@echo "Targets:"
+	@echo "  all          - Build parser (default)"
+	@echo "  lexer        - Build lexer only"
+	@echo "  parser       - Build parser (includes lexer)"
+	@echo "  test-lexer   - Run lexer tests"
+	@echo "  test-parser  - Run parser tests"
+	@echo "  test-verbose - Run tests with full output"
+	@echo "  test-ast     - Test AST generation"
+	@echo "  debug        - Build with debug symbols"
+	@echo "  clean        - Remove all generated files"
+	@echo "  clean-obj    - Remove object files only"
+	@echo "  help         - Show this help message"
+	@echo ""
+	@echo "Usage:"
+	@echo "  make              # Build parser"
+	@echo "  make test-parser  # Run all tests"
+	@echo "  make clean all    # Clean rebuild"
+	@echo ""
 
-.PHONY: all clean test-lex test-parse test-setup help parser
+# 显示配置信息
+info:
+	@echo "Build Configuration:"
+	@echo "===================="
+	@echo "CC:       $(CC)"
+	@echo "RE2C:     $(RE2C)"
+	@echo "BISON:    $(BISON)"
+	@echo "CFLAGS:   $(CFLAGS)"
+	@echo "SRC_DIR:  $(SRC_DIR)"
+	@echo "BUILD_DIR: $(BUILD_DIR)"
+	@echo ""
 
-.PHONY: all clean test test-setup help
+# ============================================================================
+# 依赖关系
+# ============================================================================
+
+# 自动生成依赖关系
+-include $(BUILD_DIR)/*.d
+
+# ============================================================================
+# 特殊目标
+# ============================================================================
+
+.SUFFIXES:
+.DELETE_ON_ERROR:
